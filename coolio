@@ -27,7 +27,6 @@ local Humanoid = Char:WaitForChild("Humanoid")
 local Orbiting = false
 local TargetName = nil
 local KILLED = false
-local SpinMode = "horizontal" -- "horizontal" or "vertical"
 local FaceOutwards = false -- Whether to face outwards or inwards
 
 local angle = 0
@@ -210,29 +209,6 @@ local function hookChat(plr)
 				notify("Player not found: " .. targetName)
 			end
 			
-			-- YSPIN
-		elseif args[1] == "yspin" then
-			-- Toggle between horizontal and vertical orbit
-			if Orbiting then
-				-- Modify existing orbit
-				if SpinMode == "horizontal" then
-					SpinMode = "vertical"
-					notify("Switched to vertical orbit")
-				else
-					SpinMode = "horizontal"
-					notify("Switched to horizontal orbit")
-				end
-			else
-				-- Start new orbit without target (orbit in place)
-				Orbiting = true
-				SpinMode = "vertical"
-				TargetName = nil
-				unsit()
-				stopAnimations()
-				
-				notify("Started vertical orbit in place")
-			end
-			
 		-- FACE
 		elseif args[1] == "face" then
 			FaceOutwards = not FaceOutwards
@@ -241,6 +217,33 @@ local function hookChat(plr)
 			else
 				notify("Facing inwards")
 			end
+			
+		-- MESSAGE
+		elseif args[1] == "m" then
+			if not args[2] then
+				notify("Usage: /m [message]")
+				return
+			end
+			
+			-- Reconstruct the message (handle spaces)
+			local message = string.sub(msg, string.find(msg, args[2]) or 3)
+			
+			-- Chat as the local player
+			game:GetService("ReplicatedStorage"):WaitForChild("DefaultChatSystemChatEvents"):WaitForChild("SayMessageRequest"):FireServer(message, "All")
+			
+			notify("Sent: " .. message)
+			
+		-- ABORT
+		elseif args[1] == "abort" then
+			KILLED = true
+			Orbiting = false
+
+			for _, c in ipairs(connections) do
+				pcall(function() c:Disconnect() end)
+			end
+			table.clear(connections)
+			
+			notify("Script aborted!")
 			
 			-- KILL SCRIPT
 		elseif args[1] == "kill" then
@@ -290,22 +293,12 @@ table.insert(connections, RunService.RenderStepped:Connect(function(dt)
 
 	angle += SPEED * dt
 
-	local offset
-	if SpinMode == "vertical" then
-		-- Vertical spinning (up and down around target - orbit vertically)
-		offset = Vector3.new(
-			0,
-			math.sin(angle) * RANGE,
-			math.cos(angle) * RANGE
-		)
-	else
-		-- Horizontal spinning (original orbit)
-		offset = Vector3.new(
-			math.cos(angle) * RANGE,
-			0,
-			math.sin(angle) * RANGE
-		)
-	end
+	-- Horizontal spinning only (removed buggy vertical mode)
+	local offset = Vector3.new(
+		math.cos(angle) * RANGE,
+		0,
+		math.sin(angle) * RANGE
+	)
 
 	pcall(function()
 		-- Calculate target position
