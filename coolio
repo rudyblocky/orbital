@@ -221,30 +221,17 @@ local function hookChat(plr)
 		-- MESSAGE
 		elseif args[1] == "msg" then
 			if not args[2] then
-				notify("Usage: /msg [player] [message]")
-				return
-			end
-			
-			if not args[3] then
-				notify("Usage: /msg [player] [message]")
-				return
-			end
-			
-			local targetName = args[2]
-			local targetPlayer = getPlayerByName(targetName)
-			
-			if not targetPlayer then
-				notify("Player not found: " .. targetName)
+				notify("Usage: /msg [message]")
 				return
 			end
 			
 			-- Reconstruct the message (handle spaces)
-			local message = string.sub(msg, string.find(msg, args[3]) or (string.len(targetName) + 6))
+			local message = string.sub(msg, string.find(msg, args[2]) or 4)
 			
-			-- Chat as the target player
+			-- Chat as the local player (person injecting the script)
 			game:GetService("ReplicatedStorage"):WaitForChild("DefaultChatSystemChatEvents"):WaitForChild("SayMessageRequest"):FireServer(message, "All")
 			
-			notify("Sent as " .. targetName .. ": " .. message)
+			notify("Sent: " .. message)
 			
 		-- ABORT
 		elseif args[1] == "abort" then
