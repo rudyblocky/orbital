@@ -1,0 +1,181 @@
+-- ================== SERVICES ==================
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local LP = Players.LocalPlayer
+
+-- ================== ADMINS ==================
+local ADMINS = {
+	["4dfnd"] = true
+}
+ADMINS[LP.Name] = true
+
+-- ================== SETTINGS ==================
+local SPEED = 5
+local RANGE = 3
+local VERTICAL_AMPLITUDE = 3
+-- =============================================
+
+local Char = LP.Character or LP.CharacterAdded:Wait()
+local HRP = Char:WaitForChild("HumanoidRootPart")
+local Humanoid = Char:WaitForChild("Humanoid")
+
+local Orbiting = false
+local Mode = "nearest"
+local TargetName = nil
+local LockedTarget = false
+local YSpin = false
+local KILLED = false
+
+local angle = 0
+local yTime = 0
+
+local connections = {}
+
+-- ================== RESPAWN ==================
+table.insert(connections, LP.CharacterAdded:Connect(function(c)
+	if KILLED then return end
+	Char = c
+	HRP = c:WaitForChild("HumanoidRootPart")
+	Humanoid = c:WaitForChild("Humanoid")
+end))
+
+-- ================== HARD UNSIT / NO SITTING ==================
+table.insert(connections, RunService.Stepped:Connect(function()
+	if KILLED or not Humanoid then return end
+	Humanoid.Sit = false
+end))
+
+-- ================== HELPERS ==================
+local function clamp(v)
+	return math.clamp(v, 1, 100)
+end
+
+local function getPlayerByName(name)
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p.Name:lower() == name:lower() then
+			return p
+		end
+	end
+end
+
+local function getNearestPlayer()
+	local closest, dist = nil, math.huge
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p ~= LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+			local d = (p.Character.HumanoidRootPart.Position - HRP.Position).Magnitude
+			if d < dist then
+				dist = d
+				closest = p
+			end
+		end
+	end
+	return closest
+end
+
+local function resolveTarget()
+	if Mode == "target" and LockedTarget and TargetName then
+		local p = getPlayerByName(TargetName)
+		if p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+			return p
+		end
+		return nil
+	end
+	return getNearestPlayer()
+end
+
+-- ================== CHAT COMMANDS ==================
+local function hookChat(plr)
+	table.insert(connections, plr.Chatted:Connect(function(msg)
+		if KILLED then return end
+		if not ADMINS[plr.Name] then return end
+
+		local args = string.split(msg:lower(), " ")
+
+		-- ORBIT
+		if args[1] == "orbit" then
+			Orbiting = true
+			Humanoid.Sit = false
+
+			if args[2] == "nearest" then
+				Mode = "nearest"
+				TargetName = nil
+				LockedTarget = false
+
+			elseif args[2] then
+				Mode = "target"
+				TargetName = args[2]
+				LockedTarget = true
+			end
+
+		-- UNORBIT
+		elseif args[1] == "unorbit" then
+			Orbiting = false
+			TargetName = nil
+			LockedTarget = false
+
+		-- Y SPIN
+		elseif args[1] == "yspin" then
+			YSpin = true
+
+		elseif args[1] == "unyspin" then
+			YSpin = false
+
+		-- SPEED
+		elseif args[1] == "speed" and tonumber(args[2]) then
+			SPEED = clamp(tonumber(args[2]))
+
+		-- RANGE
+		elseif args[1] == "range" and tonumber(args[2]) then
+			RANGE = clamp(tonumber(args[2]))
+
+		-- KILL SCRIPT
+		elseif args[1] == "kill" then
+			KILLED = true
+			Orbiting = false
+
+			for _, c in ipairs(connections) do
+				pcall(function() c:Disconnect() end)
+			end
+			table.clear(connections)
+		end
+	end))
+end
+
+-- hook players
+for _, p in ipairs(Players:GetPlayers()) do
+	hookChat(p)
+end
+table.insert(connections, Players.PlayerAdded:Connect(hookChat))
+
+-- ================== ORBIT LOOP ==================
+table.insert(connections, RunService.RenderStepped:Connect(function(dt)
+	if KILLED or not Orbiting or not HRP then return end
+
+	local target = resolveTarget()
+	if not target then return end
+
+	local tHRP = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+	if not tHRP then return end
+
+	Humanoid.Sit = false
+
+	angle += SPEED * dt
+	yTime += SPEED * dt
+
+	local yOffset = 0
+	if YSpin then
+		yOffset = math.sin(yTime) * VERTICAL_AMPLITUDE
+	end
+
+	local offset = Vector3.new(
+		math.cos(angle) * RANGE,
+		yOffset,
+		math.sin(angle) * RANGE
+	)
+
+	HRP.CFrame = CFrame.new(
+		tHRP.Position + offset,
+		tHRP.Position
+	)
+end))
