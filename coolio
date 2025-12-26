@@ -25,9 +25,7 @@ local HRP = Char:WaitForChild("HumanoidRootPart")
 local Humanoid = Char:WaitForChild("Humanoid")
 
 local Orbiting = false
-local Mode = "nearest"
 local TargetName = nil
-local LockedTarget = false
 local KILLED = false
 local SpinMode = "horizontal" -- "horizontal" or "vertical"
 
@@ -76,33 +74,13 @@ local function notify(message)
 	print("[Admin] " .. message)
 end
 
-local function getNearestPlayer()
-	if not HRP then return nil end
-	local closest, dist = nil, math.huge
-	for _, p in ipairs(Players:GetPlayers()) do
-		if p ~= LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-			local targetHRP = p.Character.HumanoidRootPart
-			if targetHRP then
-				local d = (targetHRP.Position - HRP.Position).Magnitude
-				if d < dist then
-					dist = d
-					closest = p
-				end
-			end
-		end
-	end
-	return closest
-end
-
 local function resolveTarget()
-	if Mode == "target" and LockedTarget and TargetName then
-		local p = getPlayerByName(TargetName)
-		if p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-			return p
-		end
-		return nil
+	if not TargetName then return nil end
+	local p = getPlayerByName(TargetName)
+	if p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+		return p
 	end
-	return getNearestPlayer()
+	return nil
 end
 
 local function unsit()
@@ -129,25 +107,24 @@ local function hookChat(plr)
 
 		-- ORBIT
 		if args[1] == "orbit" then
+			if not args[2] then
+				notify("Usage: /orbit [playername]")
+				return
+			end
+			
 			Orbiting = true
 			SpinMode = "horizontal"
+			TargetName = args[2]
 			unsit()
-
-			if args[2] == "nearest" or not args[2] then
-				Mode = "nearest"
-				TargetName = nil
-				LockedTarget = false
-			else
-				Mode = "target"
-				TargetName = args[2]
-				LockedTarget = true
-			end
+			
+			notify("Orbiting: " .. TargetName)
 
 			-- UNORBIT
 		elseif args[1] == "unorbit" then
 			Orbiting = false
 			TargetName = nil
-			LockedTarget = false
+			
+			notify("Stopped orbiting")
 
 			-- SPEED
 		elseif args[1] == "speed" and tonumber(args[2]) then
@@ -176,19 +153,17 @@ local function hookChat(plr)
 			
 			-- YSPIN
 		elseif args[1] == "yspin" then
+			if not args[2] then
+				notify("Usage: /yspin [playername]")
+				return
+			end
+			
 			Orbiting = true
 			SpinMode = "vertical"
+			TargetName = args[2]
 			unsit()
-
-			if args[2] == "nearest" or not args[2] then
-				Mode = "nearest"
-				TargetName = nil
-				LockedTarget = false
-			else
-				Mode = "target"
-				TargetName = args[2]
-				LockedTarget = true
-			end
+			
+			notify("Y-Spinning: " .. TargetName)
 			
 			-- KILL SCRIPT
 		elseif args[1] == "kill" then
@@ -247,5 +222,6 @@ table.insert(connections, RunService.RenderStepped:Connect(function(dt)
 		)
 	end)
 end))
+
 
 
