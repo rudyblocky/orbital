@@ -226,7 +226,7 @@ local function hookChat(plr)
 			end
 			
 			-- Reconstruct the message (handle spaces)
-			local message = string.sub(msg, string.find(msg, args[2]) or 3)
+			local message = string.sub(msg, string.find(msg, args[2]) or 4)
 			
 			-- Chat as the local player
 			game:GetService("ReplicatedStorage"):WaitForChild("DefaultChatSystemChatEvents"):WaitForChild("SayMessageRequest"):FireServer(message, "All")
