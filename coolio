@@ -5,19 +5,23 @@ local StarterGui = game:GetService("StarterGui")
 
 local LP = Players.LocalPlayer
 if not LP then
-	Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
-	LP = Players.LocalPlayer
+    Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
+    LP = Players.LocalPlayer
 end
 
 -- ================== ADMINS ==================
 local ADMINS = {
-	["4dfnd"] = true
+    ["4dfnd"] = true
 }
 ADMINS[LP.Name] = true
 
 -- ================== SETTINGS ==================
 local SPEED = 5
 local RANGE = 3
+local YSpin = false
+local verticalAmplitude = RANGE / 2
+local verticalSpeed = SPEED / 2
+local FaceOutwards = false
 -- =============================================
 
 local Char = LP.Character or LP.CharacterAdded:Wait()
@@ -27,310 +31,269 @@ local Humanoid = Char:WaitForChild("Humanoid")
 local Orbiting = false
 local TargetName = nil
 local KILLED = false
-local FaceOutwards = false -- Whether to face outwards or inwards
-
 local angle = 0
 local connections = {}
 
 -- ================== RESPAWN ==================
 table.insert(connections, LP.CharacterAdded:Connect(function(c)
-	if KILLED then return end
-	Char = c
-	HRP = c:WaitForChild("HumanoidRootPart", 5)
-	Humanoid = c:WaitForChild("Humanoid", 5)
+    if KILLED then return end
+    Char = c
+    HRP = c:WaitForChild("HumanoidRootPart", 5)
+    Humanoid = c:WaitForChild("Humanoid", 5)
 end))
 
 -- ================== HARD UNSIT / NO SITTING ==================
 table.insert(connections, RunService.Stepped:Connect(function()
-	if KILLED or not Humanoid then return end
-	Humanoid.Sit = false
+    if KILLED or not Humanoid then return end
+    Humanoid.Sit = false
 end))
 
 -- ================== HELPERS ==================
 local function clamp(v)
-	return math.max(1, math.min(100, v))
+    return math.max(1, math.min(100, v))
 end
 
 local function getPlayerByName(name)
-	if not name then return nil end
-	local lowerName = name:lower()
-	for _, p in ipairs(Players:GetPlayers()) do
-		if p.Name:lower() == lowerName then
-			return p
-		end
-	end
-	return nil
+    if not name then return nil end
+    local lowerName = name:lower()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p.Name:lower() == lowerName then
+            return p
+        end
+    end
+    return nil
 end
 
 local function notify(message)
-	pcall(function()
-		StarterGui:SetCore("ChatMakeSystemMessage", {
-			Text = "[Admin] " .. message;
-			Color = Color3.new(1, 1, 0);
-			Font = Enum.Font.SourceSansBold;
-			FontSize = Enum.FontSize.Size18;
-		})
-	end)
-	print("[Admin] " .. message)
+    pcall(function()
+        StarterGui:SetCore("ChatMakeSystemMessage", {
+            Text = "[Admin] " .. message;
+            Color = Color3.new(1, 1, 0);
+            Font = Enum.Font.SourceSansBold;
+            FontSize = Enum.FontSize.Size18;
+        })
+    end)
+    print("[Admin] " .. message)
 end
 
 local function resolveTarget()
-	if not TargetName then 
-		notify("No target specified. Use /orbit [player] or /yspin [player]")
-		return nil 
-	end
-	
-	local p = getPlayerByName(TargetName)
-	if not p then
-		notify("Player not found: " .. TargetName)
-		return nil
-	end
-	
-	if not p.Character then
-		notify("Player has no character: " .. TargetName)
-		return nil
-	end
-	
-	if not p.Character:FindFirstChild("HumanoidRootPart") then
-		notify("Player has no HumanoidRootPart: " .. TargetName)
-		return nil
-	end
-	
-	return p
+    if not TargetName then 
+        notify("No target specified. Use /orbit [player] or /yspin [player]")
+        return nil 
+    end
+    
+    local p = getPlayerByName(TargetName)
+    if not p then
+        notify("Player not found: " .. TargetName)
+        return nil
+    end
+    
+    if not p.Character then
+        notify("Player has no character: " .. TargetName)
+        return nil
+    end
+    
+    if not p.Character:FindFirstChild("HumanoidRootPart") then
+        notify("Player has no HumanoidRootPart: " .. TargetName)
+        return nil
+    end
+    
+    return p
 end
 
 local function unsit()
-	if Char and Humanoid then
-		pcall(function()
-			Humanoid.Sit = false
-			Humanoid.Jump = false
-			Humanoid:Move(Vector3.new(0, 0, 0))
-		end)
-	end
+    if Char and Humanoid then
+        pcall(function()
+            Humanoid.Sit = false
+            Humanoid.Jump = false
+            Humanoid:Move(Vector3.new(0, 0, 0))
+        end)
+    end
 end
 
 local function stopAnimations()
-	if Char and Humanoid then
-		pcall(function()
-			-- Stop all animations
-			for _, track in pairs(Humanoid:GetPlayingAnimationTracks()) do
-				track:Stop()
-			end
-			
-			-- Set walk speed to 0 to prevent movement
-			Humanoid.WalkSpeed = 0
-			Humanoid.JumpPower = 0
-			
-			-- No sit
-			Humanoid.Sit = false
-			
-			-- Keep collision enabled to prevent falling through map
-			-- Only make specific parts non-collidable if needed for orbiting
-		end)
-	end
+    if Char and Humanoid then
+        pcall(function()
+            for _, track in pairs(Humanoid:GetPlayingAnimationTracks()) do
+                track:Stop()
+            end
+            Humanoid.WalkSpeed = 0
+            Humanoid.JumpPower = 0
+            Humanoid.Sit = false
+        end)
+    end
 end
 
 local function restoreAnimations()
-	if Char and Humanoid then
-		pcall(function()
-			-- Restore movement
-			Humanoid.WalkSpeed = 16
-			Humanoid.JumpPower = 50
-			
-			-- Ensure collision is restored
-			for _, part in ipairs(Char:GetDescendants()) do
-				if part:IsA("BasePart") then
-					part.CanCollide = true
-				end
-			end
-		end)
-	end
+    if Char and Humanoid then
+        pcall(function()
+            Humanoid.WalkSpeed = 16
+            Humanoid.JumpPower = 50
+            for _, part in ipairs(Char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = true
+                end
+            end
+        end)
+    end
 end
 
 -- ================== CHAT COMMANDS ==================
 local function hookChat(plr)
-	table.insert(connections, plr.Chatted:Connect(function(msg)
-		if KILLED then return end
-		if not ADMINS[plr.Name] then return end
+    table.insert(connections, plr.Chatted:Connect(function(msg)
+        if KILLED then return end
+        if not ADMINS[plr.Name] then return end
 
-		-- Remove prefix and split
-		local cleanMsg = msg
-		if msg:sub(1,1) == "/" then
-			cleanMsg = msg:sub(2)
-		end
-		
-		local args = string.split(cleanMsg:lower(), " ")
+        local cleanMsg = msg
+        if msg:sub(1,1) == "/" then
+            cleanMsg = msg:sub(2)
+        end
+        
+        local args = string.split(cleanMsg:lower(), " ")
 
-		-- ORBIT
-		if args[1] == "orbit" then
-			if not args[2] then
-				notify("Usage: /orbit [playername]")
-				return
-			end
-			
-			Orbiting = true
-			SpinMode = "horizontal"
-			TargetName = args[2]
-			unsit()
-			stopAnimations()
-			
-			notify("Orbiting: " .. TargetName)
+        -- ORBIT
+        if args[1] == "orbit" then
+            if not args[2] then
+                notify("Usage: /orbit [playername]")
+                return
+            end
+            Orbiting = true
+            SpinMode = "horizontal"
+            TargetName = args[2]
+            unsit()
+            stopAnimations()
+            notify("Orbiting: " .. TargetName)
 
-			-- UNORBIT
-		elseif args[1] == "unorbit" then
-			Orbiting = false
-			TargetName = nil
-			restoreAnimations()
-			
-			notify("Stopped orbiting")
+        -- UNORBIT
+        elseif args[1] == "unorbit" then
+            Orbiting = false
+            TargetName = nil
+            restoreAnimations()
+            notify("Stopped orbiting")
 
-			-- SPEED
-		elseif args[1] == "speed" and tonumber(args[2]) then
-			SPEED = clamp(tonumber(args[2]))
+        -- SPEED
+        elseif args[1] == "speed" and tonumber(args[2]) then
+            SPEED = clamp(tonumber(args[2]))
+            verticalSpeed = SPEED / 2
 
-			-- RANGE
-		elseif args[1] == "range" and tonumber(args[2]) then
-			RANGE = clamp(tonumber(args[2]))
+        -- RANGE
+        elseif args[1] == "range" and tonumber(args[2]) then
+            RANGE = clamp(tonumber(args[2]))
+            verticalAmplitude = RANGE / 2
 
-			-- ADMIN
-		elseif args[1] == "admin" and args[2] then
-			local targetName = args[2]
-			local targetPlayer = getPlayerByName(targetName)
-			
-			if targetPlayer then
-				if ADMINS[targetPlayer.Name] then
-					ADMINS[targetPlayer.Name] = nil
-					notify("Removed " .. targetPlayer.Name .. " from admins")
-				else
-					ADMINS[targetPlayer.Name] = true
-					notify("Added " .. targetPlayer.Name .. " to admins")
-				end
-			else
-				notify("Player not found: " .. targetName)
-			end
-			
-		-- FACE
-		elseif args[1] == "face" then
-			FaceOutwards = not FaceOutwards
-			if FaceOutwards then
-				notify("Facing outwards")
-			else
-				notify("Facing inwards")
-			end
-			
-		-- MESSAGE
-		elseif args[1] == "msg" then
-			if not args[2] then
-				notify("Usage: /msg [message]")
-				return
-			end
-			
-			-- Reconstruct the message (handle spaces)
-			local message = string.sub(msg, string.find(msg, args[2]) or 4)
-			
-			-- Chat as the local player (person injecting the script)
-			game:GetService("ReplicatedStorage"):WaitForChild("DefaultChatSystemChatEvents"):WaitForChild("SayMessageRequest"):FireServer(message, "All")
-			
-			notify("Sent: " .. message)
-			
-		-- ABORT
-		elseif args[1] == "abort" then
-			KILLED = true
-			Orbiting = false
+        -- ADMIN
+        elseif args[1] == "admin" and args[2] then
+            local targetName = args[2]
+            local targetPlayer = getPlayerByName(targetName)
+            if targetPlayer then
+                if ADMINS[targetPlayer.Name] then
+                    ADMINS[targetPlayer.Name] = nil
+                    notify("Removed " .. targetPlayer.Name .. " from admins")
+                else
+                    ADMINS[targetPlayer.Name] = true
+                    notify("Added " .. targetPlayer.Name .. " to admins")
+                end
+            else
+                notify("Player not found: " .. targetName)
+            end
 
-			for _, c in ipairs(connections) do
-				pcall(function() c:Disconnect() end)
-			end
-			table.clear(connections)
-			
-			notify("Script aborted!")
-			
-			-- KILL SCRIPT
-		elseif args[1] == "kill" then
-			KILLED = true
-			Orbiting = false
+        -- FACE
+        elseif args[1] == "face" then
+            FaceOutwards = not FaceOutwards
+            notify(FaceOutwards and "Facing outwards" or "Facing inwards")
 
-			for _, c in ipairs(connections) do
-				pcall(function() c:Disconnect() end)
-			end
-			table.clear(connections)
-		end
-	end))
+        -- YSPIN
+        elseif args[1] == "yspin" then
+            YSpin = not YSpin
+            notify(YSpin and "Vertical spiral enabled" or "Vertical spiral disabled")
+
+        -- UNSIT
+        elseif args[1] == "unsit" then
+            unsit()
+            notify("Forced unsit")
+
+        -- ABORT
+        elseif args[1] == "abort" then
+            KILLED = true
+            Orbiting = false
+            for _, c in ipairs(connections) do
+                pcall(function() c:Disconnect() end)
+            end
+            table.clear(connections)
+            notify("Script aborted!")
+
+        -- KILL SCRIPT
+        elseif args[1] == "kill" then
+            KILLED = true
+            Orbiting = false
+            for _, c in ipairs(connections) do
+                pcall(function() c:Disconnect() end)
+            end
+            table.clear(connections)
+        end
+    end))
 end
 
--- hook players
+-- hook all players
 for _, p in ipairs(Players:GetPlayers()) do
-	hookChat(p)
+    hookChat(p)
 end
 table.insert(connections, Players.PlayerAdded:Connect(hookChat))
 
 -- ================== ORBIT LOOP ==================
 table.insert(connections, RunService.RenderStepped:Connect(function(dt)
-	if KILLED or not Orbiting or not HRP then return end
+    if KILLED or not Orbiting or not HRP then return end
 
-	local target = resolveTarget()
-	local centerPosition
-	
-	if target then
-		-- Orbit around target
-		local tHRP = target.Character:FindFirstChild("HumanoidRootPart")
-		if not tHRP then 
-			notify("Target lost: " .. TargetName)
-			Orbiting = false
-			TargetName = nil
-			restoreAnimations()
-			return
-		end
-		centerPosition = tHRP.Position
-	else
-		-- Orbit in place around current position
-		if not Orbiting then return end
-		centerPosition = HRP.Position
-	end
+    local target = resolveTarget()
+    local centerPosition
+    
+    if target then
+        local tHRP = target.Character:FindFirstChild("HumanoidRootPart")
+        if not tHRP then 
+            notify("Target lost: " .. TargetName)
+            Orbiting = false
+            TargetName = nil
+            restoreAnimations()
+            return
+        end
+        centerPosition = tHRP.Position
+    else
+        centerPosition = HRP.Position
+    end
 
-	unsit()
-	stopAnimations()
+    unsit()
+    stopAnimations()
 
-	angle += SPEED * dt
+    angle += SPEED * dt
 
-	-- Horizontal spinning only (removed buggy vertical mode)
-	local offset = Vector3.new(
-		math.cos(angle) * RANGE,
-		0,
-		math.sin(angle) * RANGE
-	)
+    local offset
+    if YSpin then
+        offset = Vector3.new(
+            math.cos(angle) * RANGE,
+            math.sin(angle * verticalSpeed) * verticalAmplitude,
+            math.sin(angle) * RANGE
+        )
+    else
+        offset = Vector3.new(
+            math.cos(angle) * RANGE,
+            0,
+            math.sin(angle) * RANGE
+        )
+    end
 
-	pcall(function()
-		-- Calculate target position
-		local targetPosition = centerPosition + offset
-		
-		-- Ensure we don't go below the center position (prevent falling)
-		if targetPosition.Y < centerPosition.Y - 1 then
-			targetPosition = Vector3.new(targetPosition.X, centerPosition.Y, targetPosition.Z)
-		end
-		
-		-- Determine look direction
-		local lookAtPosition
-		if FaceOutwards then
-			-- Face away from center
-			lookAtPosition = targetPosition + (targetPosition - centerPosition).Unit
-		else
-			-- Face towards center
-			lookAtPosition = centerPosition
-		end
-		
-		-- Create target CFrame
-		local targetCFrame = CFrame.new(
-			targetPosition,
-			lookAtPosition
-		)
-		
-		-- Smooth transition using lerp with higher responsiveness
-		HRP.CFrame = HRP.CFrame:Lerp(targetCFrame, 0.5)
-		
-		-- Ensure character stays at correct height to prevent falling
-		if (HRP.Position - centerPosition).Magnitude > RANGE * 2 then
-			HRP.CFrame = targetCFrame
-		end
-	end)
+    pcall(function()
+        local targetPosition = centerPosition + offset
+        if targetPosition.Y < centerPosition.Y - 1 then
+            targetPosition = Vector3.new(targetPosition.X, centerPosition.Y, targetPosition.Z)
+        end
+
+        local lookAtPosition = FaceOutwards and (targetPosition + (targetPosition - centerPosition).Unit) or centerPosition
+        local targetCFrame = CFrame.new(targetPosition, lookAtPosition)
+
+        HRP.CFrame = HRP.CFrame:Lerp(targetCFrame, 0.5)
+
+        if (HRP.Position - centerPosition).Magnitude > RANGE * 2 then
+            HRP.CFrame = targetCFrame
+        end
+    end)
 end))
