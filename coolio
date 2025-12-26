@@ -219,9 +219,9 @@ local function hookChat(plr)
 			end
 			
 		-- MESSAGE
-		elseif args[1] == "m" then
+		elseif args[1] == "msg" then
 			if not args[2] then
-				notify("Usage: /m [message]")
+				notify("Usage: /msg [message]")
 				return
 			end
 			
