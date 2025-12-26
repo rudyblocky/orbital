@@ -1,8 +1,13 @@
 -- ================== SERVICES ==================
-local Players = game.Players
-local RunService = game.RunService
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
 
 local LP = Players.LocalPlayer
+if not LP then
+	Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
+	LP = Players.LocalPlayer
+end
 
 -- ================== ADMINS ==================
 local ADMINS = {
@@ -33,8 +38,8 @@ local connections = {}
 table.insert(connections, LP.CharacterAdded:Connect(function(c)
 	if KILLED then return end
 	Char = c
-	HRP = c:WaitForChild("HumanoidRootPart")
-	Humanoid = c:WaitForChild("Humanoid")
+	HRP = c:WaitForChild("HumanoidRootPart", 5)
+	Humanoid = c:WaitForChild("Humanoid", 5)
 end))
 
 -- ================== HARD UNSIT / NO SITTING ==================
@@ -45,25 +50,44 @@ end))
 
 -- ================== HELPERS ==================
 local function clamp(v)
-	return math.clamp(v, 1, 100)
+	return math.max(1, math.min(100, v))
 end
 
 local function getPlayerByName(name)
+	if not name then return nil end
+	local lowerName = name:lower()
 	for _, p in ipairs(Players:GetPlayers()) do
-		if p.Name:lower() == name:lower() then
+		if p.Name:lower() == lowerName then
 			return p
 		end
 	end
+	return nil
+end
+
+local function notify(message)
+	pcall(function()
+		StarterGui:SetCore("ChatMakeSystemMessage", {
+			Text = "[Admin] " .. message;
+			Color = Color3.new(1, 1, 0);
+			Font = Enum.Font.SourceSansBold;
+			FontSize = Enum.FontSize.Size18;
+		})
+	end)
+	print("[Admin] " .. message)
 end
 
 local function getNearestPlayer()
+	if not HRP then return nil end
 	local closest, dist = nil, math.huge
 	for _, p in ipairs(Players:GetPlayers()) do
 		if p ~= LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-			local d = (p.Character.HumanoidRootPart.Position - HRP.Position).Magnitude
-			if d < dist then
-				dist = d
-				closest = p
+			local targetHRP = p.Character.HumanoidRootPart
+			if targetHRP then
+				local d = (targetHRP.Position - HRP.Position).Magnitude
+				if d < dist then
+					dist = d
+					closest = p
+				end
 			end
 		end
 	end
@@ -83,7 +107,9 @@ end
 
 local function unsit()
 	if Char and Humanoid then
-		Humanoid.Sit = false
+		pcall(function()
+			Humanoid.Sit = false
+		end)
 	end
 end
 
@@ -139,13 +165,13 @@ local function hookChat(plr)
 			if targetPlayer then
 				if ADMINS[targetPlayer.Name] then
 					ADMINS[targetPlayer.Name] = nil
-					print("Removed " .. targetPlayer.Name .. " from admins")
+					notify("Removed " .. targetPlayer.Name .. " from admins")
 				else
 					ADMINS[targetPlayer.Name] = true
-					print("Added " .. targetPlayer.Name .. " to admins")
+					notify("Added " .. targetPlayer.Name .. " to admins")
 				end
 			else
-				print("Player not found: " .. targetName)
+				notify("Player not found: " .. targetName)
 			end
 			
 			-- YSPIN
@@ -214,9 +240,12 @@ table.insert(connections, RunService.RenderStepped:Connect(function(dt)
 		)
 	end
 
-	HRP.CFrame = CFrame.new(
-		tHRP.Position + offset,
-		tHRP.Position
-	)
+	pcall(function()
+		HRP.CFrame = CFrame.new(
+			tHRP.Position + offset,
+			tHRP.Position
+		)
+	end)
 end))
+
 
