@@ -117,9 +117,6 @@ local function stopAnimations()
 				track:Stop()
 			end
 			
-			-- Disable platform stand to prevent animations
-			Humanoid.PlatformStand = true
-			
 			-- Set walk speed to 0 to prevent movement
 			Humanoid.WalkSpeed = 0
 			Humanoid.JumpPower = 0
@@ -127,12 +124,8 @@ local function stopAnimations()
 			-- No sit
 			Humanoid.Sit = false
 			
-			-- No clip - make character cancollide false
-			for _, part in ipairs(Char:GetDescendants()) do
-				if part:IsA("BasePart") then
-					part.CanCollide = false
-				end
-			end
+			-- Keep collision enabled to prevent falling through map
+			-- Only make specific parts non-collidable if needed for orbiting
 		end)
 	end
 end
@@ -140,14 +133,11 @@ end
 local function restoreAnimations()
 	if Char and Humanoid then
 		pcall(function()
-			-- Restore platform stand
-			Humanoid.PlatformStand = false
-			
 			-- Restore movement
 			Humanoid.WalkSpeed = 16
 			Humanoid.JumpPower = 50
 			
-			-- Restore collision
+			-- Ensure collision is restored
 			for _, part in ipairs(Char:GetDescendants()) do
 				if part:IsA("BasePart") then
 					part.CanCollide = true
@@ -304,7 +294,12 @@ table.insert(connections, RunService.RenderStepped:Connect(function(dt)
 			tHRP.Position
 		)
 		
-		-- Smooth transition using lerp
-		HRP.CFrame = HRP.CFrame:Lerp(targetCFrame, 0.3)
+		-- Smooth transition using lerp with higher responsiveness
+		HRP.CFrame = HRP.CFrame:Lerp(targetCFrame, 0.5)
+		
+		-- Ensure character stays at correct height to prevent falling
+		if (HRP.Position - tHRP.Position).Magnitude > RANGE * 2 then
+			HRP.CFrame = targetCFrame
+		end
 	end)
 end))
