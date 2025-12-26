@@ -75,18 +75,67 @@ local function notify(message)
 end
 
 local function resolveTarget()
-	if not TargetName then return nil end
-	local p = getPlayerByName(TargetName)
-	if p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-		return p
+	if not TargetName then 
+		notify("No target specified. Use /orbit [player] or /yspin [player]")
+		return nil 
 	end
-	return nil
+	
+	local p = getPlayerByName(TargetName)
+	if not p then
+		notify("Player not found: " .. TargetName)
+		return nil
+	end
+	
+	if not p.Character then
+		notify("Player has no character: " .. TargetName)
+		return nil
+	end
+	
+	if not p.Character:FindFirstChild("HumanoidRootPart") then
+		notify("Player has no HumanoidRootPart: " .. TargetName)
+		return nil
+	end
+	
+	return p
 end
 
 local function unsit()
 	if Char and Humanoid then
 		pcall(function()
 			Humanoid.Sit = false
+			Humanoid.Jump = false
+			Humanoid:Move(Vector3.new(0, 0, 0))
+		end)
+	end
+end
+
+local function stopAnimations()
+	if Char and Humanoid then
+		pcall(function()
+			-- Stop all animations
+			for _, track in pairs(Humanoid:GetPlayingAnimationTracks()) do
+				track:Stop()
+			end
+			
+			-- Disable platform stand to prevent animations
+			Humanoid.PlatformStand = true
+			
+			-- Set walk speed to 0 to prevent movement
+			Humanoid.WalkSpeed = 0
+			Humanoid.JumpPower = 0
+		end)
+	end
+end
+
+local function restoreAnimations()
+	if Char and Humanoid then
+		pcall(function()
+			-- Restore platform stand
+			Humanoid.PlatformStand = false
+			
+			-- Restore movement
+			Humanoid.WalkSpeed = 16
+			Humanoid.JumpPower = 50
 		end)
 	end
 end
@@ -116,6 +165,7 @@ local function hookChat(plr)
 			SpinMode = "horizontal"
 			TargetName = args[2]
 			unsit()
+			stopAnimations()
 			
 			notify("Orbiting: " .. TargetName)
 
@@ -123,6 +173,7 @@ local function hookChat(plr)
 		elseif args[1] == "unorbit" then
 			Orbiting = false
 			TargetName = nil
+			restoreAnimations()
 			
 			notify("Stopped orbiting")
 
@@ -162,6 +213,7 @@ local function hookChat(plr)
 			SpinMode = "vertical"
 			TargetName = args[2]
 			unsit()
+			stopAnimations()
 			
 			notify("Y-Spinning: " .. TargetName)
 			
@@ -189,12 +241,25 @@ table.insert(connections, RunService.RenderStepped:Connect(function(dt)
 	if KILLED or not Orbiting or not HRP then return end
 
 	local target = resolveTarget()
-	if not target then return end
+	if not target then 
+		-- Stop orbiting if target is invalid
+		Orbiting = false
+		TargetName = nil
+		restoreAnimations()
+		return 
+	end
 
-	local tHRP = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
-	if not tHRP then return end
+	local tHRP = target.Character:FindFirstChild("HumanoidRootPart")
+	if not tHRP then 
+		notify("Target lost: " .. TargetName)
+		Orbiting = false
+		TargetName = nil
+		restoreAnimations()
+		return
+	end
 
 	unsit()
+	stopAnimations()
 
 	angle += SPEED * dt
 
@@ -222,6 +287,7 @@ table.insert(connections, RunService.RenderStepped:Connect(function(dt)
 		)
 	end)
 end))
+
 
 
 
