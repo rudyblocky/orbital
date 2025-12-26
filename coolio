@@ -272,11 +272,11 @@ table.insert(connections, RunService.RenderStepped:Connect(function(dt)
 
 	local offset
 	if SpinMode == "vertical" then
-		-- Vertical spinning (up and down around target - Y-axis)
+		-- Vertical spinning (up and down around target - orbit vertically)
 		offset = Vector3.new(
-			math.cos(angle) * RANGE,
+			0,
 			math.sin(angle) * RANGE,
-			0
+			math.cos(angle) * RANGE
 		)
 	else
 		-- Horizontal spinning (original orbit)
