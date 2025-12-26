@@ -123,6 +123,16 @@ local function stopAnimations()
 			-- Set walk speed to 0 to prevent movement
 			Humanoid.WalkSpeed = 0
 			Humanoid.JumpPower = 0
+			
+			-- No sit
+			Humanoid.Sit = false
+			
+			-- No clip - make character cancollide false
+			for _, part in ipairs(Char:GetDescendants()) do
+				if part:IsA("BasePart") then
+					part.CanCollide = false
+				end
+			end
 		end)
 	end
 end
@@ -136,6 +146,13 @@ local function restoreAnimations()
 			-- Restore movement
 			Humanoid.WalkSpeed = 16
 			Humanoid.JumpPower = 50
+			
+			-- Restore collision
+			for _, part in ipairs(Char:GetDescendants()) do
+				if part:IsA("BasePart") then
+					part.CanCollide = true
+				end
+			end
 		end)
 	end
 end
@@ -265,11 +282,11 @@ table.insert(connections, RunService.RenderStepped:Connect(function(dt)
 
 	local offset
 	if SpinMode == "vertical" then
-		-- Vertical spinning (up and down around target)
+		-- Vertical spinning (up and down around target - Y-axis)
 		offset = Vector3.new(
-			0,
 			math.cos(angle) * RANGE,
-			math.sin(angle) * RANGE
+			math.sin(angle) * RANGE,
+			0
 		)
 	else
 		-- Horizontal spinning (original orbit)
@@ -281,13 +298,13 @@ table.insert(connections, RunService.RenderStepped:Connect(function(dt)
 	end
 
 	pcall(function()
-		HRP.CFrame = CFrame.new(
+		-- Smooth CFrame interpolation to reduce jittering
+		local targetCFrame = CFrame.new(
 			tHRP.Position + offset,
 			tHRP.Position
 		)
+		
+		-- Smooth transition using lerp
+		HRP.CFrame = HRP.CFrame:Lerp(targetCFrame, 0.3)
 	end)
 end))
-
-
-
-
