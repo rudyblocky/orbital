@@ -1,6 +1,6 @@
 -- ================== SERVICES ==================
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+local Players = game.Players
+local RunService = game.RunService
 
 local LP = Players.LocalPlayer
 
@@ -13,7 +13,6 @@ ADMINS[LP.Name] = true
 -- ================== SETTINGS ==================
 local SPEED = 5
 local RANGE = 3
-local VERTICAL_AMPLITUDE = 3
 -- =============================================
 
 local Char = LP.Character or LP.CharacterAdded:Wait()
@@ -24,12 +23,10 @@ local Orbiting = false
 local Mode = "nearest"
 local TargetName = nil
 local LockedTarget = false
-local YSpin = false
 local KILLED = false
+local SpinMode = "horizontal" -- "horizontal" or "vertical"
 
 local angle = 0
-local yTime = 0
-
 local connections = {}
 
 -- ================== RESPAWN ==================
@@ -84,52 +81,90 @@ local function resolveTarget()
 	return getNearestPlayer()
 end
 
+local function unsit()
+	if Char and Humanoid then
+		Humanoid.Sit = false
+	end
+end
+
 -- ================== CHAT COMMANDS ==================
 local function hookChat(plr)
 	table.insert(connections, plr.Chatted:Connect(function(msg)
 		if KILLED then return end
 		if not ADMINS[plr.Name] then return end
 
-		local args = string.split(msg:lower(), " ")
+		-- Remove prefix and split
+		local cleanMsg = msg
+		if msg:sub(1,1) == "/" then
+			cleanMsg = msg:sub(2)
+		end
+		
+		local args = string.split(cleanMsg:lower(), " ")
 
 		-- ORBIT
 		if args[1] == "orbit" then
 			Orbiting = true
-			Humanoid.Sit = false
+			SpinMode = "horizontal"
+			unsit()
 
-			if args[2] == "nearest" then
+			if args[2] == "nearest" or not args[2] then
 				Mode = "nearest"
 				TargetName = nil
 				LockedTarget = false
-
-			elseif args[2] then
+			else
 				Mode = "target"
 				TargetName = args[2]
 				LockedTarget = true
 			end
 
-		-- UNORBIT
+			-- UNORBIT
 		elseif args[1] == "unorbit" then
 			Orbiting = false
 			TargetName = nil
 			LockedTarget = false
 
-		-- Y SPIN
-		elseif args[1] == "yspin" then
-			YSpin = true
-
-		elseif args[1] == "unyspin" then
-			YSpin = false
-
-		-- SPEED
+			-- SPEED
 		elseif args[1] == "speed" and tonumber(args[2]) then
 			SPEED = clamp(tonumber(args[2]))
 
-		-- RANGE
+			-- RANGE
 		elseif args[1] == "range" and tonumber(args[2]) then
 			RANGE = clamp(tonumber(args[2]))
 
-		-- KILL SCRIPT
+			-- ADMIN
+		elseif args[1] == "admin" and args[2] then
+			local targetName = args[2]
+			local targetPlayer = getPlayerByName(targetName)
+			
+			if targetPlayer then
+				if ADMINS[targetPlayer.Name] then
+					ADMINS[targetPlayer.Name] = nil
+					print("Removed " .. targetPlayer.Name .. " from admins")
+				else
+					ADMINS[targetPlayer.Name] = true
+					print("Added " .. targetPlayer.Name .. " to admins")
+				end
+			else
+				print("Player not found: " .. targetName)
+			end
+			
+			-- YSPIN
+		elseif args[1] == "yspin" then
+			Orbiting = true
+			SpinMode = "vertical"
+			unsit()
+
+			if args[2] == "nearest" or not args[2] then
+				Mode = "nearest"
+				TargetName = nil
+				LockedTarget = false
+			else
+				Mode = "target"
+				TargetName = args[2]
+				LockedTarget = true
+			end
+			
+			-- KILL SCRIPT
 		elseif args[1] == "kill" then
 			KILLED = true
 			Orbiting = false
@@ -158,24 +193,30 @@ table.insert(connections, RunService.RenderStepped:Connect(function(dt)
 	local tHRP = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
 	if not tHRP then return end
 
-	Humanoid.Sit = false
+	unsit()
 
 	angle += SPEED * dt
-	yTime += SPEED * dt
 
-	local yOffset = 0
-	if YSpin then
-		yOffset = math.sin(yTime) * VERTICAL_AMPLITUDE
+	local offset
+	if SpinMode == "vertical" then
+		-- Vertical spinning (up and down around target)
+		offset = Vector3.new(
+			0,
+			math.cos(angle) * RANGE,
+			math.sin(angle) * RANGE
+		)
+	else
+		-- Horizontal spinning (original orbit)
+		offset = Vector3.new(
+			math.cos(angle) * RANGE,
+			0,
+			math.sin(angle) * RANGE
+		)
 	end
-
-	local offset = Vector3.new(
-		math.cos(angle) * RANGE,
-		yOffset,
-		math.sin(angle) * RANGE
-	)
 
 	HRP.CFrame = CFrame.new(
 		tHRP.Position + offset,
 		tHRP.Position
 	)
 end))
+
