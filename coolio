@@ -28,6 +28,7 @@ local Orbiting = false
 local TargetName = nil
 local KILLED = false
 local SpinMode = "horizontal" -- "horizontal" or "vertical"
+local FaceOutwards = false -- Whether to face outwards or inwards
 
 local angle = 0
 local connections = {}
@@ -211,18 +212,35 @@ local function hookChat(plr)
 			
 			-- YSPIN
 		elseif args[1] == "yspin" then
-			if not args[2] then
-				notify("Usage: /yspin [playername]")
-				return
+			-- Toggle between horizontal and vertical orbit
+			if Orbiting then
+				-- Modify existing orbit
+				if SpinMode == "horizontal" then
+					SpinMode = "vertical"
+					notify("Switched to vertical orbit")
+				else
+					SpinMode = "horizontal"
+					notify("Switched to horizontal orbit")
+				end
+			else
+				-- Start new orbit without target (orbit in place)
+				Orbiting = true
+				SpinMode = "vertical"
+				TargetName = nil
+				unsit()
+				stopAnimations()
+				
+				notify("Started vertical orbit in place")
 			end
 			
-			Orbiting = true
-			SpinMode = "vertical"
-			TargetName = args[2]
-			unsit()
-			stopAnimations()
-			
-			notify("Y-Spinning: " .. TargetName)
+		-- FACE
+		elseif args[1] == "face" then
+			FaceOutwards = not FaceOutwards
+			if FaceOutwards then
+				notify("Facing outwards")
+			else
+				notify("Facing inwards")
+			end
 			
 			-- KILL SCRIPT
 		elseif args[1] == "kill" then
@@ -248,21 +266,23 @@ table.insert(connections, RunService.RenderStepped:Connect(function(dt)
 	if KILLED or not Orbiting or not HRP then return end
 
 	local target = resolveTarget()
-	if not target then 
-		-- Stop orbiting if target is invalid
-		Orbiting = false
-		TargetName = nil
-		restoreAnimations()
-		return 
-	end
-
-	local tHRP = target.Character:FindFirstChild("HumanoidRootPart")
-	if not tHRP then 
-		notify("Target lost: " .. TargetName)
-		Orbiting = false
-		TargetName = nil
-		restoreAnimations()
-		return
+	local centerPosition
+	
+	if target then
+		-- Orbit around target
+		local tHRP = target.Character:FindFirstChild("HumanoidRootPart")
+		if not tHRP then 
+			notify("Target lost: " .. TargetName)
+			Orbiting = false
+			TargetName = nil
+			restoreAnimations()
+			return
+		end
+		centerPosition = tHRP.Position
+	else
+		-- Orbit in place around current position
+		if not Orbiting then return end
+		centerPosition = HRP.Position
 	end
 
 	unsit()
@@ -288,17 +308,35 @@ table.insert(connections, RunService.RenderStepped:Connect(function(dt)
 	end
 
 	pcall(function()
-		-- Smooth CFrame interpolation to reduce jittering
+		-- Calculate target position
+		local targetPosition = centerPosition + offset
+		
+		-- Ensure we don't go below the center position (prevent falling)
+		if targetPosition.Y < centerPosition.Y - 1 then
+			targetPosition = Vector3.new(targetPosition.X, centerPosition.Y, targetPosition.Z)
+		end
+		
+		-- Determine look direction
+		local lookAtPosition
+		if FaceOutwards then
+			-- Face away from center
+			lookAtPosition = targetPosition + (targetPosition - centerPosition).Unit
+		else
+			-- Face towards center
+			lookAtPosition = centerPosition
+		end
+		
+		-- Create target CFrame
 		local targetCFrame = CFrame.new(
-			tHRP.Position + offset,
-			tHRP.Position
+			targetPosition,
+			lookAtPosition
 		)
 		
 		-- Smooth transition using lerp with higher responsiveness
 		HRP.CFrame = HRP.CFrame:Lerp(targetCFrame, 0.5)
 		
 		-- Ensure character stays at correct height to prevent falling
-		if (HRP.Position - tHRP.Position).Magnitude > RANGE * 2 then
+		if (HRP.Position - centerPosition).Magnitude > RANGE * 2 then
 			HRP.CFrame = targetCFrame
 		end
 	end)
